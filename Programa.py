@@ -3,12 +3,12 @@ import pandas as pd
 import os
 import time
 import warnings
+import multiprocessing
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 current_directory = os.getcwd()
 print(current_directory)
-os.chdir('C:/Users/ep_jbarrientost/OneDrive - Colbun S.A/Escritorio/programa version con van anual/')
-
+#os.chdir('C:/Users/ep_jbarrientost/OneDrive - Colbun S.A/Escritorio/programa version con van anual/')
 # Creamos las funciones asociadas.
 
 # Función para pasar una fecha a string.
@@ -816,8 +816,10 @@ def buscar_tasa(datos_iniciales_cpi,año_proyeccion,mes_proyeccion):
    return tasa_men
 
 
-def CalculoPPACorte(datos,columna):
-    
+def CalculoPPACorte(columna,barrita):
+
+    datos = importar_datos('Entrada.xlsx')
+
     tabla_info,FP,subestacion,potencia_parque,capex,gx_anual,deg_anual,deg_mensual,p_suficiencia,opex_fijo,terrenos_fijo,inicio,mes_inicio,fin,mes_fin,año_proyeccion,mes_proyeccion,horizonte,proyecto,año_van,mes_van= info(datos,columna)
     fecha_inicio = fecha_to_string(inicio,mes_inicio)
     fecha_fin = fecha_to_string(fin,mes_fin)
@@ -849,13 +851,13 @@ def CalculoPPACorte(datos,columna):
     #inyeccion_cmg_hidro, años_mes_strings = local_bar_cmg(hidro,subestacion)  # Es independiente 
     inyeccion_cmg_hidro = barra_cmg_hidro(barra_local)  # Es independiente
 
-    for b in range(len(barras_proyecto)):
     
-        # Tabla de costos marginales de la barra de retiro para todas las hidrologias
-        retiro_cmg_hidro = barra_cmg_hidro(buscador_ruta(barras_proyecto[b],barras_db,rutas))  # Es independiente
+    
+    # Tabla de costos marginales de la barra de retiro para todas las hidrologias
+    retiro_cmg_hidro = barra_cmg_hidro(buscador_ruta(barras_proyecto[barrita],barras_db,rutas))  # Es independiente
 
         
-        for t in range(len(tasas)):
+    for t in range(len(tasas)):
             lcoe_a = []
             tasa_nominal = tasas[t]
             PPA_LCOE = pd.DataFrame(columns = ['Hidrología 1968','Hidrología 1998','Hidrología 2011','Hidrología 2012','Hidrología 2013','Hidrología 2014','Hidrología 2015','Hidrología 2016','Hidrología 2017','Hidrología 2018','Hidrología 2019','Hidrología 2020','Hidrología 2021','Promedio'],index = ['PPA/LCOE [USD/MWh]'])    
@@ -868,7 +870,7 @@ def CalculoPPACorte(datos,columna):
                 i = 0
                 q = 0
                 z = 0
-                print(' Proyecto: {}, Barra: {}, Tasa: {}, Hidrologia: {}'.format(proyecto,barras_proyecto[b],tasa_nominal,hidrologia+1))
+                print(' Proyecto: {}, Barra: {}, Tasa: {}, Hidrologia: {}'.format(proyecto,barras_proyecto[barrita],tasa_nominal,hidrologia+1))
                 ti = time.time()
                 while True:
                     # Tabla de costos marginales de la hidrologia para barra de inyeccion.
@@ -904,8 +906,6 @@ def CalculoPPACorte(datos,columna):
                     
                     val.append(van)
 
-                    #if i != 0:
-                    #    print('VAN es {}, LCOE es {} '.format(van,ppa))
                     
 
                     if round(van,1) == 0 and hidrologia == 0 :
@@ -914,7 +914,7 @@ def CalculoPPACorte(datos,columna):
 
                     if round(van,1) == 0 and i != 0: 
                         print('El VAN es 0')
-                        print('Proyecto: {} Barra: {}, Tasa: {}, Hidrologia: {}'.format(proyecto,barras_proyecto[b],tasa_nominal,hidrologia+1))
+                        print('Proyecto: {} Barra: {}, Tasa: {}, Hidrologia: {}'.format(proyecto,barras_proyecto[barrita],tasa_nominal,hidrologia+1))
                         print('EL LCOE es {} '.format(ppa))
                         lcoe_a.append(ppa)
                         break
@@ -989,21 +989,29 @@ def CalculoPPACorte(datos,columna):
             PPA_LCOE = PPA_LCOE.reset_index()
             
             resultado = pd.concat([ gen_anual_salida, PPA_salida,flujo_salida,PPA_LCOE],axis = 0, ignore_index = True)
-            resultado.to_excel(archivo, sheet_name = 'LCOE {}% PPA {}'.format(round(tasa_nominal*100,1),barras_proyecto[b][0:5]))
+            resultado.to_excel(archivo, sheet_name = 'LCOE {}% PPA {}'.format(round(tasa_nominal*100,1),barras_proyecto[barrita][0:5]))
 
     archivo.save()
     
+    
+def cuenta_barra(datos,columna):
+    barras = [1]
+    vector_temporal = datos.fillna(0).iloc[:,columna]
+    for i in range(13,16):
+        if vector_temporal[i] != 0:
+            barras.append(datos.iloc[i,columna])
+    return len(barras)
 
-
-def main():
-    import multiprocessing
-    import functools
-    datos = importar_datos('Entrada.xlsx')
-    pool = multiprocessing.Pool()
-    ans = pool.map(functools.partial(CalculoPPACorte, datos), range(len(datos.columns)))
-    return ans
 
 if __name__ == '__main__':
-    
-    main()
-    
+
+    datos = importar_datos('Entrada.xlsx')
+
+
+    with multiprocessing.Pool() as pool:   
+         results = [pool.starmap(CalculoPPACorte, [(columna, barrita) for columna in range(len(datos.columns)) for barrita in range(cuenta_barra(datos,columna))])]
+
+
+
+
+
