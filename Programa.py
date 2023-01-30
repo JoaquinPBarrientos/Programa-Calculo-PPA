@@ -644,8 +644,8 @@ def EBITDA(factor_cpi,gen,p_suficiencia,fecha,fin,mes_fin, PPA,PPA_anual,precio_
                 if inicio == lista_anios_presentes[i]:
                     new_columns = (lista_anios_presentes[i:])
                     break
-                opex =  datos.iloc[304:334,columna].to_list()[0:-1]
-                terrenos = datos.iloc[334:365,columna].to_list()[0:-1]
+                opex =  datos.iloc[304:333,columna].to_list()[0:-1]
+                terrenos = datos.iloc[334:363,columna].to_list()[0:-1]
                 
 
         else:
