@@ -1006,8 +1006,6 @@ def cuenta_barra(datos,columna):
 if __name__ == '__main__':
 
     datos = importar_datos('Entrada.xlsx')
-
-
     with multiprocessing.Pool() as pool:   
          results = [pool.starmap(CalculoPPACorte, [(columna, barrita) for columna in range(len(datos.columns)) for barrita in range(cuenta_barra(datos,columna))])]
 
