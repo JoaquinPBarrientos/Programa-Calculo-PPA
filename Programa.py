@@ -8,7 +8,7 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 current_directory = os.getcwd()
 print(current_directory)
-#os.chdir('C:/Users/ep_jbarrientost/OneDrive - Colbun S.A/Escritorio/programa version con van anual/')
+os.chdir('C:/Users/ep_jbarrientost/OneDrive - Colbun S.A/Escritorio/Programa Calculo PPA V2/')
 # Creamos las funciones asociadas.
 
 # Función para pasar una fecha a string.
@@ -644,19 +644,19 @@ def EBITDA(factor_cpi,gen,p_suficiencia,fecha,fin,mes_fin, PPA,PPA_anual,precio_
                 if inicio == lista_anios_presentes[i]:
                     new_columns = (lista_anios_presentes[i:])
                     break
-                opex =  datos.iloc[304:333,columna].to_list()[0:-1]
-                terrenos = datos.iloc[334:363,columna].to_list()[0:-1]
+                opex =  datos.iloc[304:335,columna].to_list()[0:-1]
+                terrenos = datos.iloc[335:,columna].to_list()[0:-1]
                 
 
         else:
 
-            opex = [-(opex_fijo*potencia_parque)/1000 for i in range(inicio,inicio+horizonte-1)]
-            terrenos = [-(terrenos_fijo*potencia_parque)/1000000 for i in range(inicio,inicio+horizonte-1)]
+            opex = [-(opex_fijo*potencia_parque)/1000 for i in range(inicio,inicio+horizonte)]
+            terrenos = [-(terrenos_fijo*potencia_parque)/1000000 for i in range(inicio,inicio+horizonte)]
 
     
     elif len(datos.iloc[:,columna]) < 304:
-        opex = [-(opex_fijo*potencia_parque)/1000 for i in range(inicio,inicio+horizonte-1)]
-        terrenos = [-(terrenos_fijo*potencia_parque)/1000000 for i in range(inicio,inicio+horizonte-1)]
+        opex = [-(opex_fijo*potencia_parque)/1000 for i in range(inicio,inicio+horizonte)]
+        terrenos = [-(terrenos_fijo*potencia_parque)/1000000 for i in range(inicio,inicio+horizonte)]
 
         
     for i in range(5):
@@ -823,7 +823,7 @@ def CalculoPPACorte(columna,barrita):
     tabla_info,FP,subestacion,potencia_parque,capex,gx_anual,deg_anual,deg_mensual,p_suficiencia,opex_fijo,terrenos_fijo,inicio,mes_inicio,fin,mes_fin,año_proyeccion,mes_proyeccion,horizonte,proyecto,año_van,mes_van= info(datos,columna)
     fecha_inicio = fecha_to_string(inicio,mes_inicio)
     fecha_fin = fecha_to_string(fin,mes_fin)
-    archivo = pd.ExcelWriter('Resultados/Resultados {}.xlsx'.format(proyecto), engine='xlsxwriter')
+    archivos = pd.ExcelWriter('Resultados/Resultados {}.xlsx'.format(proyecto), engine = 'xlsxwriter')
 
     # Valores con lo que se deben calcular cada flujo
     hidrologias = [i for i in range(0,13)]
@@ -870,7 +870,6 @@ def CalculoPPACorte(columna,barrita):
                 i = 0
                 q = 0
                 z = 0
-                print(' Proyecto: {}, Barra: {}, Tasa: {}, Hidrologia: {}'.format(proyecto,barras_proyecto[barrita],tasa_nominal,hidrologia+1))
                 ti = time.time()
                 while True:
                     # Tabla de costos marginales de la hidrologia para barra de inyeccion.
@@ -913,9 +912,8 @@ def CalculoPPACorte(columna,barrita):
                         gsalida ,gen_anual_salida, PPA_salida, flujo_salida = gsalida.reset_index(),gen_anual_salida.reset_index(), PPA_salida.reset_index(), flujo_salida.reset_index()
 
                     if round(van,1) == 0 and i != 0: 
-                        print('El VAN es 0')
-                        print('Proyecto: {} Barra: {}, Tasa: {}, Hidrologia: {}'.format(proyecto,barras_proyecto[barrita],tasa_nominal,hidrologia+1))
-                        print('EL LCOE es {} '.format(ppa))
+                        print('Proyecto: {} Barra: {}, Tasa: {}%, Hidrologia: {}'.format(proyecto,barras_proyecto[barrita],round(tasa_nominal*100,1),hidrologia+1))
+                        print('Para VAN = 0, el LCOE es {} '.format(ppa))
                         lcoe_a.append(ppa)
                         break
                     
@@ -989,9 +987,10 @@ def CalculoPPACorte(columna,barrita):
             PPA_LCOE = PPA_LCOE.reset_index()
             
             resultado = pd.concat([ gen_anual_salida, PPA_salida,flujo_salida,PPA_LCOE],axis = 0, ignore_index = True)
-            resultado.to_excel(archivo, sheet_name = 'LCOE {}% PPA {}'.format(round(tasa_nominal*100,1),barras_proyecto[barrita][0:5]))
+            resultado.to_excel(archivos, sheet_name = 'LCOE {}% PPA {}'.format(round(tasa_nominal*100,1),barras_proyecto[barrita][0:5]))
 
-    archivo.save()
+    archivos.save()
+    
     
     
 def cuenta_barra(datos,columna):
@@ -1007,9 +1006,8 @@ if __name__ == '__main__':
 
     datos = importar_datos('Entrada.xlsx')
     with multiprocessing.Pool() as pool:   
-         results = [pool.starmap(CalculoPPACorte, [(columna, barrita) for columna in range(len(datos.columns)) for barrita in range(cuenta_barra(datos,columna))])]
+         results = [pool.starmap(CalculoPPACorte, [(columna, barrita) for columna in range(1,len(datos.columns)) for barrita in range(cuenta_barra(datos,columna))])]
 
 
-
-
-
+        
+        
