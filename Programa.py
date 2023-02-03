@@ -8,7 +8,7 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 current_directory = os.getcwd()
 print(current_directory)
-os.chdir('C:/Users/ep_jbarrientost/OneDrive - Colbun S.A/Escritorio/Programa Calculo PPA V2/')
+os.chdir('C:/Users/Joaco/OneDrive - miuandes.cl/Escritorio/Programa-Calculo-PPA/')
 # Creamos las funciones asociadas.
 
 # Función para pasar una fecha a string.
@@ -637,27 +637,24 @@ def EBITDA(factor_cpi,gen,p_suficiencia,fecha,fin,mes_fin, PPA,PPA_anual,precio_
     if  len(datos.iloc[:,columna]) > 304:
 
         datos.iloc[:,columna].fillna('a',inplace=True)
-        
+
         if datos.iloc[304,columna] != 'a':
 
             for i in range(len(lista_anios_presentes)):
                 if inicio == lista_anios_presentes[i]:
                     new_columns = (lista_anios_presentes[i:])
                     break
-                opex =  datos.iloc[304:335,columna].to_list()[0:-1]
-                terrenos = datos.iloc[335:,columna].to_list()[0:-1]
+                opex =  datos.iloc[304:334,columna].to_list()
+                terrenos = datos.iloc[334:365,columna].to_list()
                 
-
         else:
 
             opex = [-(opex_fijo*potencia_parque)/1000 for i in range(inicio,inicio+horizonte)]
             terrenos = [-(terrenos_fijo*potencia_parque)/1000000 for i in range(inicio,inicio+horizonte)]
-
     
     elif len(datos.iloc[:,columna]) < 304:
         opex = [-(opex_fijo*potencia_parque)/1000 for i in range(inicio,inicio+horizonte)]
         terrenos = [-(terrenos_fijo*potencia_parque)/1000000 for i in range(inicio,inicio+horizonte)]
-
         
     for i in range(5):
             opex.insert(0,0)
@@ -673,6 +670,7 @@ def EBITDA(factor_cpi,gen,p_suficiencia,fecha,fin,mes_fin, PPA,PPA_anual,precio_
     for i in range(len(opex)):
         opex[i] = opex[i]*cpi_anual.iloc[0,i]
         terrenos[i] = terrenos[i]*cpi_anual.iloc[0,i]
+
 
 #Agrego los valores de opex y terrenos a la tabla de ebitda año , ay que no hay problemas.
     ebitda_año.loc['OPEX [MMUSD]'] = opex
@@ -816,14 +814,17 @@ def buscar_tasa(datos_iniciales_cpi,año_proyeccion,mes_proyeccion):
    return tasa_men
 
 
-def CalculoPPACorte(columna,barrita):
+def CalculoPPACorte(columna):
 
     datos = importar_datos('Entrada.xlsx')
 
     tabla_info,FP,subestacion,potencia_parque,capex,gx_anual,deg_anual,deg_mensual,p_suficiencia,opex_fijo,terrenos_fijo,inicio,mes_inicio,fin,mes_fin,año_proyeccion,mes_proyeccion,horizonte,proyecto,año_van,mes_van= info(datos,columna)
     fecha_inicio = fecha_to_string(inicio,mes_inicio)
     fecha_fin = fecha_to_string(fin,mes_fin)
-    archivos = pd.ExcelWriter('Resultados/Resultados {}.xlsx'.format(proyecto), engine = 'xlsxwriter')
+    options = {}
+    options['strings_to_formulas'] = False
+    options['strings_to_urls'] = False
+    archivo = pd.ExcelWriter('Resultados/Resultados {}.xlsx'.format(proyecto), engine = 'xlsxwriter')
 
     # Valores con lo que se deben calcular cada flujo
     hidrologias = [i for i in range(0,13)]
@@ -852,144 +853,138 @@ def CalculoPPACorte(columna,barrita):
     inyeccion_cmg_hidro = barra_cmg_hidro(barra_local)  # Es independiente
 
     
-    
-    # Tabla de costos marginales de la barra de retiro para todas las hidrologias
-    retiro_cmg_hidro = barra_cmg_hidro(buscador_ruta(barras_proyecto[barrita],barras_db,rutas))  # Es independiente
+    for barrita in range(len(barras_proyecto)):
+        # Tabla de costos marginales de la barra de retiro para todas las hidrologias
+        retiro_cmg_hidro = barra_cmg_hidro(buscador_ruta(barras_proyecto[barrita],barras_db,rutas))  # Es independiente
 
-        
-    for t in range(len(tasas)):
-            lcoe_a = []
-            tasa_nominal = tasas[t]
-            PPA_LCOE = pd.DataFrame(columns = ['Hidrología 1968','Hidrología 1998','Hidrología 2011','Hidrología 2012','Hidrología 2013','Hidrología 2014','Hidrología 2015','Hidrología 2016','Hidrología 2017','Hidrología 2018','Hidrología 2019','Hidrología 2020','Hidrología 2021','Promedio'],index = ['PPA/LCOE [USD/MWh]'])    
 
-            for h in range(len(hidrologias)):
-                hidrologia = hidrologias[h]
-                val = []
-                ppa = 200
-                p = 199
-                i = 0
-                q = 0
-                z = 0
-                ti = time.time()
-                while True:
-                    # Tabla de costos marginales de la hidrologia para barra de inyeccion.
-                    inyeccion_cmg = barra_cmg(inyeccion_cmg_hidro,hidrologia,horizonte,fecha_inicio,inicio)
-                    años_mes_strings = inyeccion_cmg.columns.to_list()
-                    # Tabla de costos marginales de la hidrologia para barra de retiro.
-                    retiro_cmg = barra_cmg(retiro_cmg_hidro,hidrologia,horizonte,fecha_inicio,inicio)
-                    # Creación de tabla de generacion de cada mes de cada año.
-                    gens = gen(generacion_seccion_dias,fecha_inicio,años_mes_strings,potencia_parque,deg_anual)
-                    # Creación de tabla de generacion de promedio anual, la cual se calcula con la tabla anterior.
-                    gen_promedio_anual = generacion_promedio_anual(gens)
-                    # Creación de tabla PPA Mes-Año, que a su vez esta divididoo en seccion del día.
-                    PPA = PPA_mes_año(gx_anual,fecha_inicio,años_mes_strings)
-                    # Creación de tabla de PPA Anual
-                    PPA_anuals, lista_anios_presentes = PPA_anual(PPA)
-                    # Creación de vector Precio PPA
-                    precio_PPAs, cpi_anual = precio_PPA(datos_iniciales_cpi,ppa,año_proyeccion,inicio,horizonte,mes_inicio)
-                    # Creación de vector factor CPI.
-                    cpi_final,factor_cpi = factorCPI(datos_iniciales_cpi)
+        for t in range(len(tasas)):
+                lcoe_a = []
+                tasa_nominal = tasas[t]
+                PPA_LCOE = pd.DataFrame(columns = ['Hidrología 1968','Hidrología 1998','Hidrología 2011','Hidrología 2012','Hidrología 2013','Hidrología 2014','Hidrología 2015','Hidrología 2016','Hidrología 2017','Hidrología 2018','Hidrología 2019','Hidrología 2020','Hidrología 2021','Promedio'],index = ['PPA/LCOE [USD/MWh]'])    
 
-                    # Modificación de tabla de valores marginales de barra de inyección.
-                    inyeccion_cmg = barra_cmg_mod(inyeccion_cmg,fecha_inicio,tasa_nominal,factor_cpi)      
-                    # Modificación de tabla de valores marginales de barra de retiro.
-                    retiro_cmg = barra_cmg_mod(retiro_cmg,fecha_inicio,tasa_nominal,factor_cpi)
-                    # Creación de tabla de EBITDA por año.
-                    ebitda_año,ebitda_mes  =  EBITDA(factor_cpi,gens,p_suficiencia,fecha_inicio,fin,mes_fin, PPA,PPA_anuals,precio_PPAs,inicio,horizonte,columna,opex_fijo,terrenos_fijo,potencia_parque,años_mes_strings,inyeccion_cmg,retiro_cmg,lista_anios_presentes,cpi_anual,datos)
-                     # Creación tabla impuesto fcf y vector capex
-                    impuesto_fcf, vector_capex = impuesto(ebitda_año,cpi_anual,capex,inicio)
-                    # Creación tabla de flujo de caja.
-                    flujo  = flujo_caja(ebitda_año,impuesto_fcf,vector_capex)
-                    # Calculo de VAN 
-                    van = VAN(flujo,tasa_nominal,datos_iniciales_cpi,año_van,mes_van,año_proyeccion,mes_proyeccion,tasa_mensual)
-                    
-                    val.append(van)
+                for h in range(len(hidrologias)):
+                    hidrologia = hidrologias[h]
+                    val = []
+                    ppa = 200
+                    p = 199
+                    i = 0
+                    q = 0
+                    z = 0
+                    ti = time.time()
+                    while True:
+                        # Tabla de costos marginales de la hidrologia para barra de inyeccion.
+                        inyeccion_cmg = barra_cmg(inyeccion_cmg_hidro,hidrologia,horizonte,fecha_inicio,inicio)
+                        años_mes_strings = inyeccion_cmg.columns.to_list()
+                        # Tabla de costos marginales de la hidrologia para barra de retiro.
+                        retiro_cmg = barra_cmg(retiro_cmg_hidro,hidrologia,horizonte,fecha_inicio,inicio)
+                        # Creación de tabla de generacion de cada mes de cada año.
+                        gens = gen(generacion_seccion_dias,fecha_inicio,años_mes_strings,potencia_parque,deg_anual)
+                        # Creación de tabla de generacion de promedio anual, la cual se calcula con la tabla anterior.
+                        gen_promedio_anual = generacion_promedio_anual(gens)
+                        # Creación de tabla PPA Mes-Año, que a su vez esta divididoo en seccion del día.
+                        PPA = PPA_mes_año(gx_anual,fecha_inicio,años_mes_strings)
+                        # Creación de tabla de PPA Anual
+                        PPA_anuals, lista_anios_presentes = PPA_anual(PPA)
+                        # Creación de vector Precio PPA
+                        precio_PPAs, cpi_anual = precio_PPA(datos_iniciales_cpi,ppa,año_proyeccion,inicio,horizonte,mes_inicio)
+                        # Creación de vector factor CPI.
+                        cpi_final,factor_cpi = factorCPI(datos_iniciales_cpi)
+                        # Modificación de tabla de valores marginales de barra de inyección.
+                        inyeccion_cmg = barra_cmg_mod(inyeccion_cmg,fecha_inicio,tasa_nominal,factor_cpi)      
+                        # Modificación de tabla de valores marginales de barra de retiro.
+                        retiro_cmg = barra_cmg_mod(retiro_cmg,fecha_inicio,tasa_nominal,factor_cpi)
+                        # Creación de tabla de EBITDA por año.
+                        ebitda_año,ebitda_mes  =  EBITDA(factor_cpi,gens,p_suficiencia,fecha_inicio,fin,mes_fin, PPA,PPA_anuals,precio_PPAs,inicio,horizonte,columna,opex_fijo,terrenos_fijo,potencia_parque,años_mes_strings,inyeccion_cmg,retiro_cmg,lista_anios_presentes,cpi_anual,datos)
+                         # Creación tabla impuesto fcf y vector capex
+                        impuesto_fcf, vector_capex = impuesto(ebitda_año,cpi_anual,capex,inicio)
+                        # Creación tabla de flujo de caja.
+                        flujo  = flujo_caja(ebitda_año,impuesto_fcf,vector_capex)
+                        # Calculo de VAN 
+                        van = VAN(flujo,tasa_nominal,datos_iniciales_cpi,año_van,mes_van,año_proyeccion,mes_proyeccion,tasa_mensual)
 
-                    
+                        val.append(van)
 
-                    if round(van,1) == 0 and hidrologia == 0 :
-                        gsalida, gen_anual_salida, PPA_salida, flujo_salida  = gens, gen_promedio_anual, precio_PPAs,flujo
-                        gsalida ,gen_anual_salida, PPA_salida, flujo_salida = gsalida.reset_index(),gen_anual_salida.reset_index(), PPA_salida.reset_index(), flujo_salida.reset_index()
+                        if round(van,1) == 0 and hidrologia == 0 :
+                            gsalida, gen_anual_salida, PPA_salida, flujo_salida  = gens, gen_promedio_anual, precio_PPAs,flujo
+                            gsalida ,gen_anual_salida, PPA_salida, flujo_salida = gsalida.reset_index(), gen_anual_salida.reset_index(), PPA_salida.reset_index(), flujo_salida.reset_index()
 
-                    if round(van,1) == 0 and i != 0: 
-                        print('Proyecto: {} Barra: {}, Tasa: {}%, Hidrologia: {}'.format(proyecto,barras_proyecto[barrita],round(tasa_nominal*100,1),hidrologia+1))
-                        print('Para VAN = 0, el LCOE es {} '.format(ppa))
-                        lcoe_a.append(ppa)
-                        break
-                    
-                    elif van > 0:
-                        ppa = ppa - p
+                        if round(van,1) == 0 and i != 0: 
+                            print('Proyecto: {} Barra: {}, Tasa: {}%, Hidrologia: {}'.format(proyecto,barras_proyecto[barrita],round(tasa_nominal*100,1),hidrologia+1))
+                            print('Para VAN = 0, el LCOE es {} '.format(ppa))
+                            lcoe_a.append(ppa)
+                            break
+                        
+                        elif van > 0:
+                            ppa = ppa - p
 
-                    elif van < 0:
-                        ppa = ppa + p
+                        elif van < 0:
+                            ppa = ppa + p
 
-                    if abs(van) < 100:
-                        q=+1
-                        if q > 5:
-                            p = p*2
-                            q = 0
+                        if abs(van) < 100:
+                            q=+1
+                            if q > 5:
+                                p = p*2
+                                q = 0
+
+                            else:
+                                p = p/2
 
                         else:
-                            p = p/2
-        
-                    else:
-                        p = p/3
-                    
-                        
+                            p = p/3
 
-                    if i > 4:
-                        if int(val[0]) == int(val[1]) == int(val[2]) and (100> abs(van) > 1):
+                        if i > 4:
+                            if int(val[0]) == int(val[1]) == int(val[2]) and (100> abs(van) > 1):
 
-                            if van >0:
-                                p = p -2
-                            else:
-                                p = p +2
+                                if van >0:
+                                    p = p -2
+                                else:
+                                    p = p +2
 
-                        elif int(val[0]) == int(val[1]) == int(val[2]) and (200 >= abs(van) > 100):
+                            elif int(val[0]) == int(val[1]) == int(val[2]) and (200 >= abs(van) > 100):
 
-                            if van > 0:
-                                p = p - 5
-                            else:
-                                p = p + 5
+                                if van > 0:
+                                    p = p - 5
+                                else:
+                                    p = p + 5
 
-                        elif int(val[0]) == int(val[1]) == int(val[2]) and (300 >= abs(van) > 200):
+                            elif int(val[0]) == int(val[1]) == int(val[2]) and (300 >= abs(van) > 200):
 
-                            if van > 0:
-                                p = p - 5
-                            else:
-                                p = p + 5
-                            
+                                if van > 0:
+                                    p = p - 5
+                                else:
+                                    p = p + 5
 
-                        elif int(val[0]) == int(val[1]) == int(val[2]) and (500 >= abs(van) > 300):
+                            elif int(val[0]) == int(val[1]) == int(val[2]) and (500 >= abs(van) > 300):
 
-                            if van > 0:
-                                p = p - 5
-                            else:
-                                p = p + 5
+                                if van > 0:
+                                    p = p - 5
+                                else:
+                                    p = p + 5
 
-                        elif int(val[0]) == int(val[1]) == int(val[2]) and abs(van) > 500:
+                            elif int(val[0]) == int(val[1]) == int(val[2]) and abs(van) > 500:
 
-                            if van > 0:
-                                p = p - 5
-                            else:
-                                p = p + 5
+                                if van > 0:
+                                    p = p - 5
+                                else:
+                                    p = p + 5
 
-                    if i > 3:
-                        val.pop(0)
+                        if i > 3:
+                            val.pop(0)
 
-                    i += 1  
-                    
-                tf = time.time()
-                print('Tiempo de ejecución: {} segundos'.format(tf-ti))
-            
-            lcoe_a.append(sum(lcoe_a)/len(lcoe_a))
-            PPA_LCOE.loc['PPA/LCOE [USD/MWh]'] = lcoe_a
-            PPA_LCOE = PPA_LCOE.reset_index()
-            
-            resultado = pd.concat([ gen_anual_salida, PPA_salida,flujo_salida,PPA_LCOE],axis = 0, ignore_index = True)
-            resultado.to_excel(archivos, sheet_name = 'LCOE {}% PPA {}'.format(round(tasa_nominal*100,1),barras_proyecto[barrita][0:5]))
+                        i += 1  
 
-    archivos.save()
+                    tf = time.time()
+                    print('Tiempo de ejecución: {} segundos'.format(tf-ti))
+
+                lcoe_a.append(sum(lcoe_a)/len(lcoe_a))
+
+        PPA_LCOE.loc['PPA/LCOE [USD/MWh]'] = lcoe_a
+        PPA_LCOE = PPA_LCOE.reset_index()
+        resultado = pd.concat([ gen_anual_salida, PPA_salida,flujo_salida,PPA_LCOE],axis = 0, ignore_index = True)
+        resultado.to_excel(archivo, sheet_name = 'LCOE {}% PPA {}'.format(round(tasa_nominal*100,1),barras_proyecto[barrita][0:5]))
+
+    archivo.save()
     
     
     
@@ -1002,12 +997,12 @@ def cuenta_barra(datos,columna):
     return len(barras)
 
 
+def parallel_processing():
+    datos = importar_datos('Entrada.xlsx')
+    with multiprocessing.Pool() as  pool:
+         results = pool.map(CalculoPPACorte, range(1,len(datos.columns)))  
+    return results
+
 if __name__ == '__main__':
 
-    datos = importar_datos('Entrada.xlsx')
-    with multiprocessing.Pool() as pool:   
-         results = [pool.starmap(CalculoPPACorte, [(columna, barrita) for columna in range(1,len(datos.columns)) for barrita in range(cuenta_barra(datos,columna))])]
-
-
-        
-        
+    results  = parallel_processing()
